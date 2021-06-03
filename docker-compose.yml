@@ -8,13 +8,17 @@ services:
     ports:
       - 127.0.0.1:3000:3000    # localhost only by default
     links:
-      - mongo:mongo
+      - mongo1:mongo1
+      - mongo2:mongo2
+      - mongo3:mongo3
       - elasticsearch:elasticsearch
     depends_on:
-      - mongo
+      - mongo1
+      - mongo2
+      - mongo3
       - elasticsearch
     environment:
-      - MONGO_URI=mongodb://mongo:27017/growi
+      - MONGO_URI=mongodb://mongo1,mongo2,mongo3/growi?replicaSet=rs0&readPreference=secondary
       - ELASTICSEARCH_URI=http://elasticsearch:9200/growi
       - PASSWORD_SEED=changeme
       # - FILE_UPLOAD=mongodb   # activate this line if you use MongoDB GridFS rather than AWS
@@ -27,7 +31,9 @@ services:
       # - FORCE_WIKI_MODE='private'   # activate this line to force wiki private mode
 
     command: "dockerize
-              -wait tcp://mongo:27017
+              -wait tcp://mongo1:27017
+              -wait tcp://mongo2:27017
+              -wait tcp://mongo3:27017
               -wait tcp://elasticsearch:9200
               -timeout 60s
               npm run server:prod"
@@ -35,12 +41,32 @@ services:
     volumes:
       - growi_data:/data
 
-  mongo:
+  # Aafter mongo1 started,
+  # run "docker-compose exec mongo1 mongo /init.js"
+  mongo1:
     image: mongo:4.4
     restart: unless-stopped
+    command: mongod --replSet rs0
     volumes:
-      - mongo_configdb:/data/configdb
-      - mongo_db:/data/db
+      - mongo1_configdb:/data/configdb
+      - mongo1_db:/data/db
+      - ./init.js:/init.js:ro
+
+  mongo2:
+    image: mongo:4.4
+    restart: unless-stopped
+    command: mongod --replSet rs0
+    volumes:
+      - mongo2_configdb:/data/configdb
+      - mongo2_db:/data/db
+
+  mongo3:
+    image: mongo:4.4
+    restart: unless-stopped
+    command: mongod --replSet rs0
+    volumes:
+      - mongo3_configdb:/data/configdb
+      - mongo3_db:/data/db
 
   elasticsearch:
     build:
@@ -60,6 +86,10 @@ services:
 
 volumes:
   growi_data:
-  mongo_configdb:
-  mongo_db:
+  mongo1_configdb:
+  mongo1_db:
+  mongo2_configdb:
+  mongo2_db:
+  mongo3_configdb:
+  mongo3_db:
   es_data:
